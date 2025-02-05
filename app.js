@@ -55,7 +55,10 @@ app.use((err, req, res, next) => {
 });
 
 // Starting the server
-app.listen(port, () => {
-  // Displays the server port
-  console.log(`Server is running at http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
