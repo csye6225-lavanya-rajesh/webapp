@@ -25,7 +25,7 @@ systemctl restart postgresql
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'password123';"
  
 # Create the database 'csye6225'
-su - postgres -c "psql -c 'CREATE DATABASE csye6225Cloud;'"
+su - postgres -c "psql -c 'CREATE DATABASE csye6225;'"
  
 # Create a new Linux group for the application
 groupadd appgroup
@@ -44,5 +44,3 @@ chown -R appuser:appgroup /opt/csye6225
 chmod -R 750 /opt/csye6225
  
 echo "Setup completed successfully!"
- 
-has context menu
