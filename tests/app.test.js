@@ -77,4 +77,20 @@ describe("/healthz endpoint", () => {
       .send({ unexpected: "data" });
     expect(res.status).toBe(400);
   });
+
+  it("should return 400 if GET /healthz is called with query parameters", async () => {
+    const res = await request(app)
+      .get("/healthz?unexpected=data");
+    expect(res.status).toBe(400);
+  });
+
+  it("should return 400 if GET /healthz is called with a broken body", async () => {
+    const res = await request(app)
+      .get("/healthz")
+      .set("Content-Type", "application/json")
+      .send("{ broken_json: true"); // Malformed JSON
+    expect(res.status).toBe(400);
+});
+
+
 });
