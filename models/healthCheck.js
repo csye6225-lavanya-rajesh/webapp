@@ -7,7 +7,7 @@ const { DataTypes, Model } = require('sequelize');
  */
 module.exports = (sequelize) => {
   const HealthCheck = sequelize.define('HealthCheck', {
-    checkId: {
+    checkId: { //Adding database columns
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
