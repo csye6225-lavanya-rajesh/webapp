@@ -1,0 +1,29 @@
+name: Continuous Integration (CI)
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'  # Change this to your Node.js version if necessary
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: yarn install  # Replace this with npm install if using npm
+
+      # Step 4: Run tests
+      - name: Run tests
+        run: yarn test  # Replace this with npm test if using npm
