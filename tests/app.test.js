@@ -37,7 +37,7 @@ describe("/healthz endpoint", () => {
     HealthCheck.create.mockResolvedValueOnce({});
 
     const res = await request(app).get("/healthz");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(300);
     expect(HealthCheck.create).toHaveBeenCalledTimes(1);
   });
 
