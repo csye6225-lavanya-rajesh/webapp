@@ -80,7 +80,7 @@ build {
   ]
 
   provisioner "file" {
-    source      = "/tmp/webapp.zip"
+    source      = "../webapp.zip"
     destination = "/tmp/webapp.zip" # Target path in the VM
   }
 

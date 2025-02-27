@@ -1,0 +1,36 @@
+name: Packer CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  packer-fmt-validate:
+    name: Packer Format and Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@main
+
+      - name: Init Packer
+        run: |
+          cd packer
+          packer init machine-image.pkr.hcl 
+        continue-on-error: false
+
+      - name: Run Packer Format Check
+        run: |
+          cd packer
+          packer fmt machine-image.pkr.hcl
+        continue-on-error: false
+
+      - name: Run Packer Validate
+        run: |
+          cd packer
+          packer validate machine-image.pkr.hcl
+        continue-on-error: false
