@@ -85,50 +85,50 @@ build {
   }
 
   provisioner "shell" {
-  inline = [
-    # Update package lists and install required dependencies
-    "sudo apt update -y",
-    "sudo apt upgrade -y",
-    "sudo apt install -y curl gnupg lsb-release unzip zip", # Added zip here
+    inline = [
+      # Update package lists and install required dependencies
+      "sudo apt update -y",
+      "sudo apt upgrade -y",
+      "sudo apt install -y curl gnupg lsb-release unzip zip", # Added zip here
 
-    # Add PostgreSQL repository and install PostgreSQL
-    "curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc",
-    "echo \"deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -c | awk '{print $2}')-pgdg main\" | sudo tee /etc/apt/sources.list.d/pgdg.list",
-    "sudo apt update -y",
-    "sudo apt install -y postgresql postgresql-contrib",
+      # Add PostgreSQL repository and install PostgreSQL
+      "curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc",
+      "echo \"deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -c | awk '{print $2}')-pgdg main\" | sudo tee /etc/apt/sources.list.d/pgdg.list",
+      "sudo apt update -y",
+      "sudo apt install -y postgresql postgresql-contrib",
 
-    # Install Node.js and npm
-    "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -",
-    "sudo apt install -y nodejs",
+      # Install Node.js and npm
+      "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -",
+      "sudo apt install -y nodejs",
 
-    # Ensure PostgreSQL service is running and enabled
-    "sudo systemctl enable postgresql",
-    "sudo systemctl start postgresql",
+      # Ensure PostgreSQL service is running and enabled
+      "sudo systemctl enable postgresql",
+      "sudo systemctl start postgresql",
 
-    # Ensure PostgreSQL configuration allows password authentication
-    "PG_CONF=$(ls /etc/postgresql/*/main/pg_hba.conf) && sudo sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' $PG_CONF",
-    "sudo systemctl restart postgresql",
-    
-    # Set PostgreSQL password and create database
-    "sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'password123';\"",
-    "sudo -u postgres psql -c \"CREATE DATABASE csye6225;\"",
-    
-    # Ensure group and user exist
-    "sudo groupadd -f csye6225",
-    "sudo useradd -m -g csye6225 -s /bin/bash csye6225 || echo 'User csye6225 already exists'",
-    
-    # Ensure /opt/webapp exists and zip the contents of the directory
-    "sudo mkdir -p /opt/webapp",
-    "if [ -d /opt/webapp ]; then sudo zip -r /tmp/webapp.zip /opt/webapp; else echo 'WARNING: /opt/webapp directory does not exist, skipping zip.'; fi",
+      # Ensure PostgreSQL configuration allows password authentication
+      "PG_CONF=$(ls /etc/postgresql/*/main/pg_hba.conf) && sudo sed -i 's/local   all             all                                     peer/local   all             all                                     md5/' $PG_CONF",
+      "sudo systemctl restart postgresql",
 
-    # Ensure webapp.zip exists and extract it
-    "if [ -f /tmp/webapp.zip ]; then sudo unzip /tmp/webapp.zip -d /opt/webapp; else echo 'WARNING: /tmp/webapp.zip does not exist, skipping unzip.'; fi",
-    "sudo chown -R csye6225:csye6225 /opt/webapp",
+      # Set PostgreSQL password and create database
+      "sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD 'password123';\"",
+      "sudo -u postgres psql -c \"CREATE DATABASE csye6225;\"",
 
-    # Create systemd service for the webapp
-    "echo '[Unit]\nDescription=CSYE 6225 App\nConditionPathExists=/opt/webapp/webapp/.env\nAfter=network.target\n\n[Service]\nType=simple\nUser=csye6225\nGroup=csye6225\nWorkingDirectory=/opt/webapp/webapp\nExecStart=/usr/bin/node /opt/webapp/webapp/app.js\nRestart=always\nRestartSec=3\nStandardOutput=syslog\nStandardError=syslog\nSyslogIdentifier=csye6225\n\n[Install]\nWantedBy=multi-user.target' | sudo tee /etc/systemd/system/webapp.service",
-    "sudo systemctl daemon-reload",
-    "sudo systemctl enable webapp.service"
-  ]
-}
+      # Ensure group and user exist
+      "sudo groupadd -f csye6225",
+      "sudo useradd -m -g csye6225 -s /bin/bash csye6225 || echo 'User csye6225 already exists'",
+
+      # Ensure /opt/webapp exists and zip the contents of the directory
+      "sudo mkdir -p /opt/webapp",
+      "if [ -d /opt/webapp ]; then sudo zip -r /tmp/webapp.zip /opt/webapp; else echo 'WARNING: /opt/webapp directory does not exist, skipping zip.'; fi",
+
+      # Ensure webapp.zip exists and extract it
+      "if [ -f /tmp/webapp.zip ]; then sudo unzip /tmp/webapp.zip -d /opt/webapp; else echo 'WARNING: /tmp/webapp.zip does not exist, skipping unzip.'; fi",
+      "sudo chown -R csye6225:csye6225 /opt/webapp",
+
+      # Create systemd service for the webapp
+      "echo '[Unit]\nDescription=CSYE 6225 App\nConditionPathExists=/opt/webapp/webapp/.env\nAfter=network.target\n\n[Service]\nType=simple\nUser=csye6225\nGroup=csye6225\nWorkingDirectory=/opt/webapp/webapp\nExecStart=/usr/bin/node /opt/webapp/webapp/app.js\nRestart=always\nRestartSec=3\nStandardOutput=syslog\nStandardError=syslog\nSyslogIdentifier=csye6225\n\n[Install]\nWantedBy=multi-user.target' | sudo tee /etc/systemd/system/webapp.service",
+      "sudo systemctl daemon-reload",
+      "sudo systemctl enable webapp.service"
+    ]
+  }
 }
