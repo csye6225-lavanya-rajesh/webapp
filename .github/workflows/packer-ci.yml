@@ -17,6 +17,12 @@ jobs:
       - name: Install Packer
         uses: hashicorp/setup-packer@main
 
+      - name: Init Packer
+        run: |
+          cd packer
+          packer init 
+        continue-on-error: false
+
       - name: Run Packer Format Check
         run: |
           cd packer
