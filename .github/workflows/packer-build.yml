@@ -90,7 +90,8 @@ jobs:
       - name: Run Packer Build for AWS & GCP
         run: |
           cd packer
-          packer build -var "artifact_path=../webapp.zip" machine-image.pkr.hcl
+          export PACKER_VAR_artifact_path="../webapp.zip"
+          packer build machine-image.pkr.hcl
 
       - name: Verify Systemd Service
         run: |
