@@ -23,15 +23,6 @@ jobs:
           packer init machine-image.pkr.hcl 
         continue-on-error: false
 
-      - name: Install zip
-        run: sudo apt-get install -y zip
-
-      - name: Download webapp.zip
-        uses: actions/download-artifact@v4
-        with:
-          name: webapp.zip
-          path: /tmp/
-
       - name: Run Packer Format Check
         run: |
           cd packer
