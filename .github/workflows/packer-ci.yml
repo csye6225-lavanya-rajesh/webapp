@@ -20,7 +20,7 @@ jobs:
       - name: Init Packer
         run: |
           cd packer
-          packer init 
+          packer init machine-image.pkr.hcl 
         continue-on-error: false
 
       - name: Run Packer Format Check
