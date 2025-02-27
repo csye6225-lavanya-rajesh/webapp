@@ -68,20 +68,34 @@ jobs:
         uses: hashicorp/setup-packer@main
 
       # Install AWS CLI v2
-      - name: Install AWS CLI v2
+      - name: Install AWS CLI
         run: |
           sudo apt update
-          sudo apt install -y curl unzip
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
+          sudo apt install -y awscli
+          # Ensure AWS CLI is installed
+          if ! command -v aws &> /dev/null
+          then
+            echo "AWS CLI not found, installing..."
+            sudo apt install -y awscli
+          else
+            echo "AWS CLI is already installed"
+          fi
 
-      # Install GCP CLI
       - name: Install GCP CLI
         run: |
           sudo apt update
-          sudo apt install -y google-cloud-sdk
-
+          # if the gcloud command is available
+          if ! command -v gcloud &> /dev/null
+          then
+            echo "Google Cloud SDK not found, installing..."
+            sudo apt install -y google-cloud-sdk
+          else
+            echo "Google Cloud SDK is already installed, updating..."
+            sudo apt update && sudo apt upgrade -y google-cloud-sdk
+            # Ensure GCP SDK components are updated
+            gcloud components update
+          fi
+          
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
