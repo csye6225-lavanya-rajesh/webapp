@@ -1,0 +1,100 @@
+name: Packer Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  integration-test:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 1: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'  
+
+      # Step 2: Install dependencies
+      - name: Install dependencies
+        run: yarn install 
+
+      # Step 3: Run tests
+      - name: Run tests
+        run: yarn test 
+
+  build-artifact:
+    name: Build Application Artifact
+    runs-on: ubuntu-latest
+    needs: integration-test
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Artifact
+        run: |
+          echo "Building application artifact..."
+          mkdir -p artifacts
+          echo "Application Artifact" > artifacts/app.zip
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-artifact
+          path: artifacts/app.zip
+
+  build-custom-image:
+    name: Build Packer Custom Image (AWS & GCP)
+    runs-on: ubuntu-latest
+    needs: build-artifact
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: application-artifact
+          path: packer/artifacts
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@main
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt update
+          sudo apt install -y awscli
+
+      - name: Install GCP CLI
+        run: |
+          sudo apt update
+          sudo apt install -y google-cloud-sdk
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_CREDENTIALS_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.AWS_CREDENTIALS_SECRETACCESSKEY }}
+          aws-region: us-east-1
+
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Run Packer Build for AWS & GCP
+        run: |
+          cd packer-config
+          packer build -var "artifact_path=artifacts/app.zip" .
+          
+      - name: Verify Systemd Service
+        run: |
+          sudo systemctl daemon-reload
+          sudo systemctl enable webapp.service

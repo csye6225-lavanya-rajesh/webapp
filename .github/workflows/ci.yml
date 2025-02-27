@@ -18,12 +18,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'  # Change this to your Node.js version if necessary
+          node-version: '16'  
 
       # Step 3: Install dependencies
       - name: Install dependencies
-        run: yarn install  # Replace this with npm install if using npm
+        run: yarn install 
 
       # Step 4: Run tests
       - name: Run tests
-        run: yarn test  # Replace this with npm test if using npm
+        run: yarn test 
