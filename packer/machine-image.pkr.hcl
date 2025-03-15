@@ -1,4 +1,4 @@
- packer {
+packer {
   required_plugins {
     amazon = {
       version = ">= 1.0.0, < 2.0.0"
@@ -17,7 +17,7 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "aws_profile" {
+variable "aws_profile1" {
   description = "AWS CLI profile to use for authentication"
   default     = "dev"
 }
