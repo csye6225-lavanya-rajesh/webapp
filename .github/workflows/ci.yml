@@ -18,11 +18,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'  
+          node-version: '16'
 
       # Step 3: Install dependencies
       - name: Install dependencies
-        run: yarn install 
+        run: yarn install
 
       # Step 4: Create .env file
       - name: Create .env file
@@ -33,19 +33,19 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DIALECT: ${{secrets.DB_DIALECT}}   
+          DB_DIALECT: ${{ secrets.DB_DIALECT }}
         run: |
           cat <<EOF > .env
-          DATABASE_URL= $DATABASE_URL
-          DB_HOST= $DB_HOST
-          DB_PORT= $DB_PORT
-          DB_USER= $DB_USER
-          DB_NAME= $DB_NAME
-          DB_PASSWORD= $DB_PASSWORD
-          DB_DIALECT= $DB_DIALECT
+          DATABASE_URL=${DATABASE_URL}
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_USER=${DB_USER}
+          DB_NAME=${DB_NAME}
+          DB_PASSWORD=${DB_PASSWORD}
+          DB_DIALECT=${DB_DIALECT}
           EOF
           cat .env
 
       # Step 5: Run tests
       - name: Run tests
-        run: yarn test 
+        run: yarn test
