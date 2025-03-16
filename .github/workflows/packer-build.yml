@@ -1,9 +1,11 @@
 name: Packer Build
 
 on:
-  push:
+  pull_request_target:
     branches:
       - main
+    types:
+      - closed
 
 jobs:
   test-and-build:
