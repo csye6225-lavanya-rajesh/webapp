@@ -150,5 +150,5 @@ jobs:
         run: |
           gcloud compute images add-iam-policy-binding ${{ env.IMAGE_ID }} \
             --project=gcp-dev-452120 \
-            --member=projectViewer:gcp-demo-452120 \
+            --member=serviceAccount:880152553143-compute@developer.gserviceaccount.com \
             --role=roles/compute.imageUser
