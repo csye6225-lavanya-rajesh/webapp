@@ -110,9 +110,6 @@ jobs:
           cd packer
           packer init machine-image.pkr.hcl 
         continue-on-error: false
-      
-      - name: Install zip package
-        run: sudo apt-get update && sudo apt-get install -y zip  # Installing zip
 
       - name: Run Packer Build for AWS & GCP
         run: |
@@ -127,7 +124,7 @@ jobs:
             --owners self \
             --query "Images | sort_by(@, &CreationDate) | [-1].ImageId" \
             --output text \
-            --region ${{ secrets.AWS_REGION }}) \
+            --region ${{ secrets.AWS_REGION }})
           echo "AWS AMI ID: $AMI_ID"
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
 
