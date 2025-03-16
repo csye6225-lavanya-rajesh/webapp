@@ -6,15 +6,15 @@ on:
       - main
 
 jobs:
-  test:
+  test-and-build:
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:14.16
         env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}  # Secret for PostgreSQL user
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}  # Secret for PostgreSQL password
-          POSTGRES_DB: ${{ secrets.DB_NAME }}  # Secret for PostgreSQL database name
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -24,24 +24,28 @@ jobs:
           - 5432:5432
 
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }} # Secret DB URL
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
         with:
           node-version: '16'
 
-      - run: yarn install
+      - name: Install Dependencies
+        run: yarn install
 
-      - name: Wait for PostgreSQL to be ready
+      - name: Wait for PostgreSQL to be Ready
         run: |
           until pg_isready -h localhost -U ${{ secrets.DB_USER }}; do
             echo "Waiting for PostgreSQL to be ready..."
             sleep 5
           done
-      - run: yarn test
+      - name: Run Tests
+        run: yarn test
 
   build-artifact:
     name: Build and Upload Application Artifact
@@ -91,7 +95,6 @@ jobs:
       - name: Verify AWS CLI Configuration
         run: |
           aws sts get-caller-identity
-
       - name: Authenticate with GCP
         uses: google-github-actions/auth@v2
         with:
@@ -100,7 +103,6 @@ jobs:
       - name: Verify GCP Authentication
         run: |
           gcloud auth list
-
       - name: Init Packer
         run: |
           cd packer
@@ -112,7 +114,6 @@ jobs:
           cd packer
           export PACKER_VAR_artifact_path="../webapp.zip"
           packer build machine-image.pkr.hcl
-
       - name: Get Latest AWS AMI ID
         id: aws_ami
         run: |
@@ -123,7 +124,6 @@ jobs:
             --region ${{ secrets.AWS_REGION }})
           echo "AWS AMI ID: $AMI_ID"
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
-
       - name: Get Latest GCP Image ID
         id: gcp_image
         run: |
@@ -134,14 +134,12 @@ jobs:
             --limit=1)
           echo "GCP Image ID: $IMAGE_ID"
           echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV
-
       - name: Copy AWS AMI to Demo Account
         run: |
           aws ec2 modify-image-attribute \
             --image-id ${{ env.AMI_ID }} \
             --launch-permission "Add=[{UserId=676206931751}]" \
             --region ${{ secrets.AWS_REGION }}
-
       - name: Copy GCP Image to Demo Account
         run: |
           gcloud compute images add-iam-policy-binding ${{ env.IMAGE_ID }} \
