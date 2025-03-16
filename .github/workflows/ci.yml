@@ -1,43 +1,36 @@
-name: Run Tests
+name: test
 
-on:
-  push:
-    branches:
-      - main
+on: push
 
 jobs:
   test:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:13
+        image: postgres
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password123
-          POSTGRES_DB: csye6225
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
         ports:
           - 5432:5432
-        options: --health-cmd="pg_isready -U postgres -d csye6225" --health-interval=10s --health-timeout=5s --health-retries=5
-
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}  # Replace with your database name if different
     steps:
-      - name: Check out code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+      - uses: actions/setup-node@v2  # Updated to v2
         with:
-          node-version: '14'
+          node-version: '14.16'
 
-      - name: Install dependencies
-        run: yarn install
+      - run: yarn install  # Use yarn instead of npm
 
-      - name: Run tests
-        run: yarn test
-        env:
-          DATABASE_URL: postgresql://postgres:password123@localhost:5432/csye6225
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_USER: postgres
-          DB_PASSWORD: password123
-          DB_NAME: csye6225
-          DB_DIALECT: postgres
+      # Run migrations (assuming you use sequelize-cli or a similar tool)
+      - run: npx sequelize-cli db:migrate  # Adjust if you're using a different migration tool
+
+      # Run the tests
+      - run: yarn test  # Running tests using yarn
