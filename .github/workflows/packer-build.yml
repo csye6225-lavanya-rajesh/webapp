@@ -6,66 +6,64 @@ on:
       - main
 
 jobs:
-  integration-test:
-    name: Run Integration Tests
+  test-and-build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14.16
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
-      # Step 1: Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'  
+          node-version: '16'
 
-      # Step 2: Install dependencies
-      - name: Install dependencies
-        run: yarn install 
+      - name: Install Dependencies
+        run: yarn install
 
-      - name: Create .env file
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_DIALECT: ${{secrets.DB_DIALECT}}   
+      - name: Wait for PostgreSQL to be Ready
         run: |
-          cat <<EOF > .env
-          DATABASE_URL=$DATABASE_URL
-          DB_HOST=$DB_HOST
-          DB_PORT=$DB_PORT
-          DB_USER=$DB_USER
-          DB_PASSWORD=$DB_PASSWORD
-          DB_NAME=$DB_NAME
-          DB_DIALECT=$DB_DIALECT
-          EOF
-          cat .env
+          until pg_isready -h localhost -U ${{ secrets.DB_USER }}; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 5
+          done
 
-      # Step 3: Run tests
-      - name: Run tests
-        run: yarn test 
+      - name: Run Tests
+        run: yarn test
 
   build-artifact:
-    name: Build Application Artifact
+    name: Build and Upload Application Artifact
     runs-on: ubuntu-latest
-    needs: integration-test
+    needs: test-and-build
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
-      - name: Build Artifact
+      - name: Build Application Artifact
         run: |
-          echo "Building application artifact..."
           mkdir -p artifacts
           echo "Application Artifact" > artifacts/app.zip
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
           name: application-artifact
           path: artifacts/app.zip
@@ -77,42 +75,28 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
+      - name: Download Application Artifact
+        uses: actions/download-artifact@v2
         with:
           name: application-artifact
           path: packer/artifacts
 
       - name: Install Packer
-        uses: hashicorp/setup-packer@main
+        uses: hashicorp/setup-packer@v2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_CREDENTIALS_ACCESSKEY }}
           aws-secret-access-key: ${{ secrets.AWS_CREDENTIALS_SECRETACCESSKEY }}
-          aws-region: us-east-1
-
-      - name: Verify AWS CLI Configuration
-        run: |
-          aws sts get-caller-identity
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Authenticate with GCP
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-      - name: Verify GCP Authentication
-        run: |
-          gcloud auth list
-
-      - name: Init Packer
-        run: |
-          cd packer
-          packer init machine-image.pkr.hcl 
-        continue-on-error: false
 
       - name: Run Packer Build for AWS & GCP
         run: |
