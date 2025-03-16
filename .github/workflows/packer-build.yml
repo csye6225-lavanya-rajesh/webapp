@@ -44,7 +44,6 @@ jobs:
             echo "Waiting for PostgreSQL to be ready..."
             sleep 5
           done
-
       - name: Run Tests
         run: yarn test
 
@@ -62,7 +61,6 @@ jobs:
           echo "Building application artifact..."
           mkdir -p artifacts
           echo "Application Artifact" > artifacts/app.zip
-
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -112,11 +110,11 @@ jobs:
           cd packer
           packer init machine-image.pkr.hcl 
         continue-on-error: false
-
+      
       - name: Install zip package
         run: sudo apt-get update && sudo apt-get install -y zip  # Installing zip
 
-      - name: Run Packer Build for AWS & GCP (with machine-readable output)
+      - name: Run Packer Build for AWS & GCP
         run: |
           cd packer
           export PACKER_VAR_artifact_path="../webapp.zip"
