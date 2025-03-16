@@ -8,22 +8,38 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14.16
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER }}  # Secret for PostgreSQL user
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}  # Secret for PostgreSQL password
+          POSTGRES_DB: ${{ secrets.DB_NAME }}  # Secret for PostgreSQL database name
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }} # Secret DB URL
 
     steps:
-      # Step 1: Checkout the code
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-      # Step 2: Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+      - uses: actions/setup-node@v2
         with:
-          node-version: '16'  
+          node-version: '16'
 
-      # Step 3: Install dependencies
-      - name: Install dependencies
-        run: yarn install 
+      - run: yarn install
 
-      # Step 4: Run tests
-      - name: Run tests
-        run: yarn test 
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -U ${{ secrets.DB_USER }}; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 5
+          done
+
+      - run: yarn test
