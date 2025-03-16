@@ -27,12 +27,6 @@ jobs:
         with:
           node-version: '16'
 
-      - run: yarn install
-
-      # Wait for PostgreSQL to be ready
-      - run: |
-          curl -sL https://github.com/vishnubob/wait-for-it/releases/download/v2.3.0/wait-for-it.sh -o wait-for-it.sh
-          chmod +x wait-for-it.sh
-          ./wait-for-it.sh localhost:5432 --timeout=60 --strict -- echo "Postgres is up"
+      - run: yarn instalL
 
       - run: yarn test
