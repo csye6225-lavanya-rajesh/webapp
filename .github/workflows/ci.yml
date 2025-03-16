@@ -9,21 +9,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:14
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.DB_NAME }}
-        options: >-
-          --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
     steps:
       # Step 1: Checkout the code
       - name: Checkout code
@@ -39,25 +24,22 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
-      # Step 4: Set up environment variables
-      - name: Set up .env file
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DB_PORT: 5432  # Using the port where the postgres service is running
-          DB_HOST: localhost  # Using localhost to connect to the service
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DIALECT: postgres
+      # Set environment variables in .env
+      - name: Set up environment variables
         run: |
-          echo "DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" > .env
-          echo "DB_HOST=localhost" >> .env
-          echo "DB_PORT=${DB_PORT}" >> .env
-          echo "DB_USER=${DB_USER}" >> .env
-          echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
-          echo "DB_NAME=${DB_NAME}" >> .env
-          echo "DB_DIALECT=${DB_DIALECT}" >> .env
-          cat .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }} >> .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "DB_DIALECT=${{ secrets.DB_DIALECT }}" >> .env
+
+      # Set up PostgreSQL (or SQLite for testing)
+      - name: Set up PostgreSQL
+        uses: postgres-actions/setup-postgresql@v2
+        with:
+          postgresql-version: '14'
 
       # Step 5: Run tests
       - name: Run tests
