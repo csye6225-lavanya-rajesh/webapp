@@ -4,17 +4,13 @@ on:
   pull_request:
     branches:
       - main
-      
+
 jobs:
   test:
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password123
-          POSTGRES_DB: your_database_name  # Add this to set up a database
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -23,7 +19,7 @@ jobs:
         ports:
           - 5432:5432
     env:
-      DATABASE_URL: postgres://postgres:password123@localhost:5432/your_database_name  # Update with the correct DB URL
+      DATABASE_URL: postgres://postgres:password123@localhost:5432/csye6225 # Update with the correct DB URL
     steps:
       - uses: actions/checkout@v2
 
