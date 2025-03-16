@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres
+        image: postgres:14.16
         env:
           POSTGRES_USER: ${{ secrets.DB_USER }}  # Secret for PostgreSQL user
           POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}  # Secret for PostgreSQL password
@@ -34,6 +34,8 @@ jobs:
           node-version: '16'
 
       - run: yarn install
+
+      - run: yarn run migrate:up  # Run migrations before tests
 
       - name: Wait for PostgreSQL to be ready
         run: |
