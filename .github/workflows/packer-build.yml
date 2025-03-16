@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v2
@@ -55,15 +55,16 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Build Application Artifact
+      - name: Build Artifact
         run: |
+          echo "Building application artifact..."
           mkdir -p artifacts
           echo "Application Artifact" > artifacts/app.zip
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: application-artifact
           path: artifacts/app.zip
@@ -75,16 +76,16 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download Application Artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: application-artifact
           path: packer/artifacts
 
       - name: Install Packer
-        uses: hashicorp/setup-packer@v2
+        uses: hashicorp/setup-packer@main
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -93,13 +94,52 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_CREDENTIALS_SECRETACCESSKEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Verify AWS CLI Configuration
+        run: |
+          aws sts get-caller-identity
+
       - name: Authenticate with GCP
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Verify GCP Authentication
+        run: |
+          gcloud auth list
+
+      - name: Init Packer
+        run: |
+          cd packer
+          packer init machine-image.pkr.hcl 
+        continue-on-error: false
 
       - name: Run Packer Build for AWS & GCP
         run: |
           cd packer
           export PACKER_VAR_artifact_path="../webapp.zip"
           packer build machine-image.pkr.hcl
+
+      - name: Capture AWS AMI ID
+        run: |
+          AMI_ID=$(grep -o 'ami-[a-f0-9]\{8,17\}' packer-output.txt)
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV  # Store AWS AMI ID in GitHub environment
+
+      - name: Capture GCP Image ID
+        run: |
+          IMAGE_ID=$(grep -o 'custom-gce-image-[0-9]\{10\}' packer-output.txt)
+          echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV  # Store GCP Image ID in GitHub environment
+
+      - name: Copy AWS AMI to Demo Account
+        run: |
+          aws ec2 modify-image-attribute \
+            --image-id ${{ env.AMI_ID }} \
+            --launch-permission "Add=[{UserId=676206931751}]" \
+            --region us-east-1 \
+            --profile dev
+
+      - name: Copy GCP Image to Demo Account
+        run: |
+          gcloud compute images add-iam-policy-binding ${{ env.IMAGE_ID }} \
+            --project=gcp-dev-452120 \
+            --member=projectViewer:gcp-demo-452120 \
+            --role=roles/compute.imageUser
