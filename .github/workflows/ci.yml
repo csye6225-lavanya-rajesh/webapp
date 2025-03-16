@@ -27,7 +27,7 @@ jobs:
       # Set environment variables in .env
       - name: Set up environment variables
         run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }} >> .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
           echo "DB_USER=${{ secrets.DB_USER }}" >> .env
@@ -36,10 +36,8 @@ jobs:
           echo "DB_DIALECT=${{ secrets.DB_DIALECT }}" >> .env
 
       # Set up PostgreSQL (or SQLite for testing)
-      - name: Set up PostgreSQL
-        uses: postgres-actions/setup-postgresql@v2
-        with:
-          postgresql-version: '14'
+      - name: Install PostgreSQL
+        run: sudo apt-get install -y postgresql-14
 
       # Step 5: Run tests
       - name: Run tests
