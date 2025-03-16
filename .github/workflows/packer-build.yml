@@ -112,6 +112,9 @@ jobs:
           cd packer
           packer init machine-image.pkr.hcl 
         continue-on-error: false
+      
+      - name: Install zip package
+        run: sudo apt-get update && sudo apt-get install -y zip  # Installing zip
 
       - name: Run Packer Build for AWS & GCP
         run: |
