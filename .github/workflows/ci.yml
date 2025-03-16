@@ -9,65 +9,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:14
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ${{ secrets.DB_USER }}"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        env:
-          POSTGRES_USER: ${{ secrets.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.DB_NAME }}
-
     steps:
       # Step 1: Checkout the code
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       # Step 2: Set up Node.js
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v2
         with:
-          node-version: '16'
-          cache: 'yarn'
+          node-version: '16'  
 
       # Step 3: Install dependencies
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install 
 
-      # Step 4: Set up .env file from GitHub Secrets
-      - name: Set up environment variables
-        run: |
-          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
-          echo "DB_HOST=localhost" >> .env
-          echo "DB_PORT=5432" >> .env
-          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-          echo "DB_DIALECT=${{ secrets.DB_DIALECT }}" >> .env
-
-      # Step 5: Wait for PostgreSQL to be ready
-      - name: Wait for PostgreSQL
-        run: |
-          for i in {1..10}; do
-            pg_isready -h localhost -p 5432 -U ${{ secrets.DB_USER }} && break
-            echo "Waiting for database..."
-            sleep 3
-          done
-
-      # Step 6: Run database migrations
-      - name: Run database migrations
-        run: yarn sequelize db:migrate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      # Step 7: Run tests
+      # Step 4: Run tests
       - name: Run tests
-        run: yarn test
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: yarn test 
