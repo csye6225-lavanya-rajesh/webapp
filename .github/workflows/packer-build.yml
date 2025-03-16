@@ -127,8 +127,7 @@ jobs:
             --owners self \
             --query "Images | sort_by(@, &CreationDate) | [-1].ImageId" \
             --output text \
-            --region ${{ secrets.AWS_REGION }} \
-            --profile dev)
+            --region ${{ secrets.AWS_REGION }}) \
           echo "AWS AMI ID: $AMI_ID"
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
 
