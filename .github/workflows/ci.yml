@@ -9,6 +9,25 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:14
+        ports:
+          - 5432:5432
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DB_PORT: ${{ secrets.DB_PORT }}  # Using the port where the postgres service is running
+          DB_HOST: ${{ secrets.DB_HOST }}  # Using localhost to connect to the service
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DIALECT: ${{ secrets.DB_DIALECT }}
+        options: >-
+          --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       # Step 1: Checkout the code
       - name: Checkout code
@@ -28,20 +47,20 @@ jobs:
       - name: Create .env file
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}  # Using the port where the postgres service is running
+          DB_HOST: ${{ secrets.DB_HOST }}  # Using localhost to connect to the service
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_DIALECT: ${{ secrets.DB_DIALECT }}
         run: |
           cat <<EOF > .env
-          DATABASE_URL=${DATABASE_URL}
+          DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}
           DB_HOST=${DB_HOST}
           DB_PORT=${DB_PORT}
           DB_USER=${DB_USER}
-          DB_NAME=${DB_NAME}
           DB_PASSWORD=${DB_PASSWORD}
+          DB_NAME=${DB_NAME}
           DB_DIALECT=${DB_DIALECT}
           EOF
           cat .env
