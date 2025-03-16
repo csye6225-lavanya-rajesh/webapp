@@ -27,6 +27,6 @@ jobs:
         with:
           node-version: '16'
 
-      - run: yarn instalL
+      - run: yarn install
 
       - run: yarn test
