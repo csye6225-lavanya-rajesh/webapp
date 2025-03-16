@@ -19,15 +19,20 @@ jobs:
         ports:
           - 5432:5432
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}  # Replace with your database name if different
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}  # Replace with your actual DB name
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/setup-node@v2  # Updated to v2
+      - uses: actions/setup-node@v2
         with:
           node-version: '16'
 
-      - run: yarn install  # Use yarn instead of npm
+      - run: yarn install
 
-      # Run the tests
-      - run: yarn test  # Running tests using yarn
+      # Wait for PostgreSQL to be ready
+      - run: |
+          curl -sL https://github.com/vishnubob/wait-for-it/releases/download/v2.3.0/wait-for-it.sh -o wait-for-it.sh
+          chmod +x wait-for-it.sh
+          ./wait-for-it.sh localhost:5432 --timeout=60 --strict -- echo "Postgres is up"
+
+      - run: yarn test
