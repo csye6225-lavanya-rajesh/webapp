@@ -86,10 +86,18 @@ build {
 
   provisioner "shell" {
     inline = [
-      # Update package lists and install required dependencies
+       # Ensure package lists are updated
       "sudo apt update -y",
       "sudo apt upgrade -y",
-      "sudo apt install -y curl gnupg lsb-release unzip zip", # Added zip here
+      "sudo apt clean",
+
+      # Ensure 'universe' repository is enabled
+      "sudo apt-get install -y software-properties-common",
+      "sudo add-apt-repository universe",
+      "sudo apt-get update -y",
+
+      # Install required packages, including zip
+      "sudo apt install -y curl gnupg lsb-release unzip zip",
 
       # Add PostgreSQL repository and install PostgreSQL
       "curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc",
