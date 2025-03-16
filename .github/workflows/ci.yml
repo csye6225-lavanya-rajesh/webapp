@@ -37,7 +37,7 @@ jobs:
 
       # Set up PostgreSQL (or SQLite for testing)
       - name: Install PostgreSQL
-        run: sudo apt-get install -y postgresql-14
+        run: sudo apt-get update && sudo apt-get install -y postgresql
 
       # Step 5: Run tests
       - name: Run tests
