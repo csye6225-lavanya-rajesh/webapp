@@ -41,5 +41,4 @@ jobs:
             echo "Waiting for PostgreSQL to be ready..."
             sleep 5
           done
-
       - run: yarn test
