@@ -29,8 +29,5 @@ jobs:
 
       - run: yarn install  # Use yarn instead of npm
 
-      # Run migrations (assuming you use sequelize-cli or a similar tool)
-      - run: npx sequelize-cli db:migrate  # Adjust if you're using a different migration tool
-
       # Run the tests
       - run: yarn test  # Running tests using yarn
