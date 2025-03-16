@@ -1,7 +1,10 @@
-name: test
+name: Continuous Integration (CI)
 
-on: push
-
+on:
+  pull_request:
+    branches:
+      - main
+      
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,6 +14,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password123
+          POSTGRES_DB: your_database_name  # Add this to set up a database
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -19,7 +23,7 @@ jobs:
         ports:
           - 5432:5432
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}  # Replace with your actual DB name
+      DATABASE_URL: postgres://postgres:password123@localhost:5432/your_database_name  # Update with the correct DB URL
     steps:
       - uses: actions/checkout@v2
 
@@ -28,5 +32,12 @@ jobs:
           node-version: '16'
 
       - run: yarn install
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -U postgres; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 5
+          done
 
       - run: yarn test
