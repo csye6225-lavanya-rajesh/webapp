@@ -112,24 +112,32 @@ jobs:
           cd packer
           packer init machine-image.pkr.hcl 
         continue-on-error: false
-      
+
       - name: Install zip package
         run: sudo apt-get update && sudo apt-get install -y zip  # Installing zip
 
-      - name: Run Packer Build for AWS & GCP
+      - name: Run Packer Build for AWS & GCP (with machine-readable output)
         run: |
           cd packer
           export PACKER_VAR_artifact_path="../webapp.zip"
-          packer build machine-image.pkr.hcl
+          packer build -machine-readable machine-image.pkr.hcl | tee packer-output.log
 
       - name: Capture AWS AMI ID
         run: |
-          AMI_ID=$(grep -o 'ami-[a-f0-9]\{8,17\}' packer-output.txt)
+          AMI_ID=$(grep -o 'ami-[a-f0-9]\{8,17\}' packer-output.log | tail -n 1)
+          if [[ -z "$AMI_ID" ]]; then
+            echo "Error: AMI ID not found!"
+            exit 1
+          fi
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV  # Store AWS AMI ID in GitHub environment
 
       - name: Capture GCP Image ID
         run: |
-          IMAGE_ID=$(grep -o 'custom-gce-image-[0-9]\{10\}' packer-output.txt)
+          IMAGE_ID=$(grep -o 'custom-gce-image-[0-9]\{10\}' packer-output.log | tail -n 1)
+          if [[ -z "$IMAGE_ID" ]]; then
+            echo "Error: GCP Image ID not found!"
+            exit 1
+          fi
           echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV  # Store GCP Image ID in GitHub environment
 
       - name: Copy AWS AMI to Demo Account
