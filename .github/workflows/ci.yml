@@ -35,8 +35,6 @@ jobs:
 
       - run: yarn install
 
-      - run: yarn run migrate:up  # Run migrations before tests
-
       - name: Wait for PostgreSQL to be ready
         run: |
           until pg_isready -h localhost -U ${{ secrets.DB_USER }}; do
