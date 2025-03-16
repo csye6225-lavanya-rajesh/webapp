@@ -86,7 +86,7 @@ build {
 
   provisioner "shell" {
     inline = [
-       # Ensure package lists are updated
+      # Ensure package lists are updated
       "sudo apt update -y",
       "sudo apt upgrade -y",
       "sudo apt clean",
