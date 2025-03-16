@@ -120,31 +120,35 @@ jobs:
           export PACKER_VAR_artifact_path="../webapp.zip"
           packer build -machine-readable machine-image.pkr.hcl | tee packer-output.log
 
-      - name: Capture AWS AMI ID
+      - name: Get Latest AWS AMI ID
+        id: aws_ami
         run: |
-          AMI_ID=$(grep -o 'ami-[a-f0-9]\{8,17\}' packer-output.log | tail -n 1)
-          if [[ -z "$AMI_ID" ]]; then
-            echo "Error: AMI ID not found!"
-            exit 1
-          fi
-          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV  # Store AWS AMI ID in GitHub environment
+          AMI_ID=$(aws ec2 describe-images \
+            --owners self \
+            --query "Images | sort_by(@, &CreationDate) | [-1].ImageId" \
+            --output text \
+            --region ${{ secrets.AWS_REGION }} \
+            --profile dev)
+          echo "AWS AMI ID: $AMI_ID"
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
 
-      - name: Capture GCP Image ID
+      - name: Get Latest GCP Image ID
+        id: gcp_image
         run: |
-          IMAGE_ID=$(grep -o 'custom-gce-image-[0-9]\{10\}' packer-output.log | tail -n 1)
-          if [[ -z "$IMAGE_ID" ]]; then
-            echo "Error: GCP Image ID not found!"
-            exit 1
-          fi
-          echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV  # Store GCP Image ID in GitHub environment
+          IMAGE_ID=$(gcloud compute images list \
+            --project=gcp-dev-452120 \
+            --sort-by=~creationTimestamp \
+            --format="value(name)" \
+            --limit=1)
+          echo "GCP Image ID: $IMAGE_ID"
+          echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV
 
       - name: Copy AWS AMI to Demo Account
         run: |
           aws ec2 modify-image-attribute \
             --image-id ${{ env.AMI_ID }} \
             --launch-permission "Add=[{UserId=676206931751}]" \
-            --region us-east-1 \
-            --profile dev
+            --region ${{ secrets.AWS_REGION }}
 
       - name: Copy GCP Image to Demo Account
         run: |
