@@ -35,7 +35,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: '18'
 
       - name: Install Dependencies
         run: yarn install
@@ -46,6 +46,7 @@ jobs:
             echo "Waiting for PostgreSQL to be ready..."
             sleep 5
           done
+
       - name: Run Tests
         run: yarn test
 
@@ -63,6 +64,7 @@ jobs:
           echo "Building application artifact..."
           mkdir -p artifacts
           echo "Application Artifact" > artifacts/app.zip
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -115,7 +117,7 @@ jobs:
       - name: Run Packer Build for AWS #& GCP
         run: |
           cd packer
-          export PACKER_VAR_artifact_path="../webapp.zip"
+          export PACKER_VAR_artifact_path="artifacts/app.zip"
           packer build machine-image.pkr.hcl
 
       - name: Get Latest AWS AMI ID
