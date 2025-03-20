@@ -5,10 +5,10 @@ packer {
       source  = "github.com/hashicorp/amazon"
     }
 
-    googlecompute = {
-      version = ">= 1.0.0, < 2.0.0"
-      source  = "github.com/hashicorp/googlecompute"
-    }
+    # googlecompute = {
+    #   version = ">= 1.0.0, < 2.0.0"
+    #   source  = "github.com/hashicorp/googlecompute"
+    # }
   }
 }
 
@@ -28,20 +28,20 @@ variable "instance_type" {
 }
 
 # GCP Variables
-variable "gcp_project_id" {
-  description = "GCP Project ID"
-  default     = "gcp-dev-452120"
-}
+# variable "gcp_project_id" {
+#   description = "GCP Project ID"
+#   default     = "gcp-dev-452120"
+# }
 
-variable "gcp_region" {
-  description = "GCP Region"
-  default     = "us-east1"
-}
+# variable "gcp_region" {
+#   description = "GCP Region"
+#   default     = "us-east1"
+# }
 
-variable "gcp_zone" {
-  description = "GCP Zone"
-  default     = "us-central1-a"
-}
+# variable "gcp_zone" {
+#   description = "GCP Zone"
+#   default     = "us-central1-a"
+# }
 
 source "amazon-ebs" "custom_ami" {
   region        = var.aws_region
@@ -61,31 +61,48 @@ source "amazon-ebs" "custom_ami" {
 }
 
 # GCP Image Source
-source "googlecompute" "custom_gce_image" {
-  project_id          = var.gcp_project_id
-  region              = var.gcp_region
-  zone                = var.gcp_zone
-  machine_type        = "e2-medium"
-  source_image_family = "ubuntu-2204-lts"
-  image_name          = "custom-gce-image-{{timestamp}}"
-  image_family        = "custom-webapp-family"
-  image_description   = "Custom GCE image with PostgreSQL and WebApp"
-  ssh_username        = "ubuntu"
-}
+# source "googlecompute" "custom_gce_image" {
+#   project_id          = var.gcp_project_id
+#   region              = var.gcp_region
+#   zone                = var.gcp_zone
+#   machine_type        = "e2-medium"
+#   source_image_family = "ubuntu-2204-lts"
+#   image_name          = "custom-gce-image-{{timestamp}}"
+#   image_family        = "custom-webapp-family"
+#   image_description   = "Custom GCE image with PostgreSQL and WebApp"
+#   ssh_username        = "ubuntu"
+# }
 
 build {
   sources = [
     "source.amazon-ebs.custom_ami",
-    "source.googlecompute.custom_gce_image"
+    # "source.googlecompute.custom_gce_image"
   ]
 
+  provisioner "shell" {
+    inline = [
+      # Ensure the /opt/webapp directory exists
+      "sudo mkdir -p /opt/webapp",
+      "sudo chown -R ubuntu:ubuntu /opt/webapp"
+    ]
+  }
+
   provisioner "file" {
-    source      = "../webapp.zip"
-    destination = "/tmp/webapp.zip" # Target path in the VM
+    source      = "../"
+    destination = "/opt/webapp" # Target path in the VM
   }
 
   provisioner "shell" {
     inline = [
+      # Create the user and group
+      "sudo groupadd -f csye6225",
+      "sudo useradd -m -g csye6225 -s /bin/bash csye6225 || echo 'User csye6225 already exists'",
+
+      # Now, set the correct ownership
+      "sudo chown -R csye6225:csye6225 /opt/webapp",
+
+      "sudo chmod -R 755 /opt/webapp",
+
       # Ensure package lists are updated
       "sudo apt update -y",
       "sudo apt upgrade -y",
@@ -124,22 +141,22 @@ build {
       # Ensure PostgreSQL client is installed (but not the server)
       "sudo apt install -y postgresql-client",
 
-      # Ensure group and user exist
-      "sudo groupadd -f csye6225",
-      "sudo useradd -m -g csye6225 -s /bin/bash csye6225 || echo 'User csye6225 already exists'",
+      # # Ensure group and user exist
+      # "sudo groupadd -f csye6225",
+      # "sudo useradd -m -g csye6225 -s /bin/bash csye6225 || echo 'User csye6225 already exists'",
 
-      # Ensure /opt/webapp exists and zip the contents of the directory
-      "sudo mkdir -p /opt/webapp",
-      "if [ -d /opt/webapp ]; then sudo zip -r /tmp/webapp.zip /opt/webapp; else echo 'WARNING: /opt/webapp directory does not exist, skipping zip.'; fi",
+      # # Ensure /opt/webapp exists and zip the contents of the directory
+      # "sudo mkdir -p /opt/webapp",
+      # "if [ -d /opt/webapp ]; then sudo zip -r /tmp/webapp.zip /opt/webapp; else echo 'WARNING: /opt/webapp directory does not exist, skipping zip.'; fi",
 
-      # Ensure webapp.zip exists and extract it
-      "if [ -f /tmp/webapp.zip ]; then sudo unzip /tmp/webapp.zip -d /opt/webapp; else echo 'WARNING: /tmp/webapp.zip does not exist, skipping unzip.'; fi",
-      "sudo chown -R csye6225:csye6225 /opt/webapp",
+      # # Ensure webapp.zip exists and extract it
+      # "if [ -f /tmp/webapp.zip ]; then sudo unzip /tmp/webapp.zip -d /opt/webapp; else echo 'WARNING: /tmp/webapp.zip does not exist, skipping unzip.'; fi",
+      # "sudo chown -R csye6225:csye6225 /opt/webapp",
 
-      "rm -f /opt/webapp/.env",
+      "sudo rm -f /opt/webapp/.env",
 
       # Create systemd service for the webapp
-      "echo '[Unit]\nDescription=CSYE 6225 App\nConditionPathExists=/opt/webapp/webapp/.env\nAfter=network.target\n\n[Service]\nType=simple\nUser=csye6225\nGroup=csye6225\nWorkingDirectory=/opt/webapp/webapp\nExecStart=/usr/bin/node /opt/webapp/webapp/app.js\nRestart=always\nRestartSec=3\nStandardOutput=syslog\nStandardError=syslog\nSyslogIdentifier=csye6225\n\n[Install]\nWantedBy=multi-user.target' | sudo tee /etc/systemd/system/webapp.service",
+      "echo '[Unit]\nDescription=CSYE 6225 App\nConditionPathExists=/opt/webapp/.env\nAfter=network.target\n\n[Service]\nType=simple\nUser=csye6225\nGroup=csye6225\nWorkingDirectory=/opt/webapp\nExecStart=/usr/bin/node /opt/webapp/app.js\nRestart=always\nRestartSec=3\nStandardOutput=syslog\nStandardError=syslog\nSyslogIdentifier=csye6225\n\n[Install]\nWantedBy=multi-user.target' | sudo tee /etc/systemd/system/webapp.service",
       "sudo systemctl daemon-reload",
       "sudo systemctl enable webapp.service"
     ]
