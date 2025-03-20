@@ -141,6 +141,9 @@ build {
       # Ensure PostgreSQL client is installed (but not the server)
       "sudo apt install -y postgresql-client",
 
+      # Install npm dependencies
+      "cd /opt/webapp && sudo npm install",
+
       # # Ensure group and user exist
       # "sudo groupadd -f csye6225",
       # "sudo useradd -m -g csye6225 -s /bin/bash csye6225 || echo 'User csye6225 already exists'",
