@@ -114,11 +114,12 @@ jobs:
       # - name: Verify GCP Authentication
       #   run: |
       #     gcloud auth list
-      # - name: Init Packer
-      #   run: |
-      #     cd packer
-      #     packer init machine-image.pkr.hcl 
-      #   continue-on-error: false
+
+      - name: Init Packer
+        run: |
+          cd packer
+          packer init machine-image.pkr.hcl 
+        continue-on-error: false
 
       - name: Run Packer Build for AWS #& GCP
         run: |
