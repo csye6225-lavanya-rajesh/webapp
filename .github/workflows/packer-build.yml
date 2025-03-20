@@ -35,7 +35,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '16'
+          node-version: '18'
+      
+      - name: Verify Node.js Version
+        run: node -v
+
+      - name: Clear Yarn Cache
+        run: yarn cache clean
 
       - name: Install Dependencies
         run: yarn install
@@ -46,6 +52,7 @@ jobs:
             echo "Waiting for PostgreSQL to be ready..."
             sleep 5
           done
+
       - name: Run Tests
         run: yarn test
 
@@ -63,6 +70,7 @@ jobs:
           echo "Building application artifact..."
           mkdir -p artifacts
           echo "Application Artifact" > artifacts/app.zip
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -97,25 +105,27 @@ jobs:
       - name: Verify AWS CLI Configuration
         run: |
           aws sts get-caller-identity
-      - name: Authenticate with GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
 
-      - name: Verify GCP Authentication
-        run: |
-          gcloud auth list
-      - name: Init Packer
+      # - name: Authenticate with GCP
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      # - name: Verify GCP Authentication
+      #   run: |
+      #     gcloud auth list
+      # - name: Init Packer
+      #   run: |
+      #     cd packer
+      #     packer init machine-image.pkr.hcl 
+      #   continue-on-error: false
+
+      - name: Run Packer Build for AWS #& GCP
         run: |
           cd packer
-          packer init machine-image.pkr.hcl 
-        continue-on-error: false
-
-      - name: Run Packer Build for AWS & GCP
-        run: |
-          cd packer
-          export PACKER_VAR_artifact_path="../webapp.zip"
+          export PACKER_VAR_artifact_path="artifacts/app.zip"
           packer build machine-image.pkr.hcl
+
       - name: Get Latest AWS AMI ID
         id: aws_ami
         run: |
@@ -126,25 +136,28 @@ jobs:
             --region ${{ secrets.AWS_REGION }})
           echo "AWS AMI ID: $AMI_ID"
           echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
-      - name: Get Latest GCP Image ID
-        id: gcp_image
-        run: |
-          IMAGE_ID=$(gcloud compute images list \
-            --project=gcp-dev-452120 \
-            --sort-by=~creationTimestamp \
-            --format="value(name)" \
-            --limit=1)
-          echo "GCP Image ID: $IMAGE_ID"
-          echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV
+
+      # - name: Get Latest GCP Image ID
+      #   id: gcp_image
+      #   run: |
+      #     IMAGE_ID=$(gcloud compute images list \
+      #       --project=gcp-dev-452120 \
+      #       --sort-by=~creationTimestamp \
+      #       --format="value(name)" \
+      #       --limit=1)
+      #     echo "GCP Image ID: $IMAGE_ID"
+      #     echo "IMAGE_ID=$IMAGE_ID" >> $GITHUB_ENV
+
       - name: Copy AWS AMI to Demo Account
         run: |
           aws ec2 modify-image-attribute \
             --image-id ${{ env.AMI_ID }} \
             --launch-permission "Add=[{UserId=676206931751}]" \
             --region ${{ secrets.AWS_REGION }}
-      - name: Copy GCP Image to Demo Account
-        run: |
-          gcloud compute images add-iam-policy-binding ${{ env.IMAGE_ID }} \
-            --project=gcp-dev-452120 \
-            --member=serviceAccount:880152553143-compute@developer.gserviceaccount.com \
-            --role=roles/compute.imageUser
+
+      # - name: Copy GCP Image to Demo Account
+      #   run: |
+      #     gcloud compute images add-iam-policy-binding ${{ env.IMAGE_ID }} \
+      #       --project=gcp-dev-452120 \
+      #       --member=serviceAccount:880152553143-compute@developer.gserviceaccount.com \
+      #       --role=roles/compute.imageUser
