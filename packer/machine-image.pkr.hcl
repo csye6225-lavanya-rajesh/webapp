@@ -83,7 +83,13 @@ build {
     inline = [
       # Ensure the /opt/webapp directory exists
       "sudo mkdir -p /opt/webapp",
-      "sudo chown -R ubuntu:ubuntu /opt/webapp"
+      "sudo chown -R ubuntu:ubuntu /opt/webapp",
+
+      # Create and set permissions for csye6225.log
+      "sudo touch /var/log/csye6225.log",
+      "sudo chown ubuntu:ubuntu /var/log/csye6225.log", # Change to ubuntu user
+      "sudo chmod 644 /var/log/csye6225.log",
+
     ]
   }
 
@@ -100,8 +106,10 @@ build {
 
       # Now, set the correct ownership
       "sudo chown -R csye6225:csye6225 /opt/webapp",
+      "sudo chown -R csye6225:csye6225 /var/log/csye6225.log",
 
       "sudo chmod -R 755 /opt/webapp",
+      "sudo chmod -R 755 /var/log/csye6225.log",
 
       # Ensure package lists are updated
       "sudo apt update -y",
@@ -162,6 +170,53 @@ build {
       "echo '[Unit]\nDescription=CSYE 6225 App\nConditionPathExists=/opt/webapp/.env\nAfter=network.target\n\n[Service]\nType=simple\nUser=csye6225\nGroup=csye6225\nWorkingDirectory=/opt/webapp\nExecStart=/usr/bin/node /opt/webapp/app.js\nRestart=always\nRestartSec=3\nStandardOutput=syslog\nStandardError=syslog\nSyslogIdentifier=csye6225\n\n[Install]\nWantedBy=multi-user.target' | sudo tee /etc/systemd/system/webapp.service",
       "sudo systemctl daemon-reload",
       "sudo systemctl enable webapp.service"
+    ]
+  }
+
+  provisioner "shell" {
+    inline = [<<EOF
+      sudo apt update -y
+      sudo mkdir -p /opt/aws/
+
+      # Download the CloudWatch Agent
+      cd /opt/aws/ && sudo wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+      sudo dpkg -i /opt/aws/amazon-cloudwatch-agent.deb  # Corrected the deb package name
+
+#       # Create CloudWatch Agent configuration file
+#       sudo bash -c 'cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-config.json <<EOF
+# {
+#   "agent": {
+#     "metrics_collection_interval": 10,
+#     "logfile": "/var/log/cloudwatch-config.log"
+#   },
+#   "logs": {
+#     "logs_collected": {
+#       "files": {
+#         "collect_list": [
+#           {
+#             "file_path": "/var/log/csye6225.log",
+#             "log_group_name": "csye6225",
+#             "log_stream_name": "webapp"
+#           }
+#         ]
+#       }
+#     }
+#   },
+#   "metrics": {
+#     "metrics_collected": {
+#       "statsd": {
+#         "service_address": ":8125",
+#         "metrics_collection_interval": 15,
+#         "metrics_aggregation_interval": 300
+#       }
+#     }
+#   }
+# }
+# EOF'
+
+      # Enable and restart CloudWatch Agent service
+      sudo systemctl enable amazon-cloudwatch-agent
+    EOF
     ]
   }
 }
