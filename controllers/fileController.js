@@ -1,13 +1,21 @@
-const AWS = require('aws-sdk');
 const { File } = require('../models');
 const { v4: uuidv4 } = require('uuid');
-const s3 = new AWS.S3({
-  region: 'us-east-1',
-});
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3({ region: 'us-east-1' });
+const { statsd } = require('../cloudwatch/metrics');
+const logger = require('../cloudwatch/logger');
 
-// Function to save file metadata directly in the controller
+// Save file metadata (unchanged)
 const saveFileMetadata = async (fileName, fileId, s3Path, uploadDate, fileSize, contentType, expirationDate, fileExtension) => {
+  const start = Date.now();
   try {
+    logger.info(`Starting to save metadata for file: ${fileName} (ID: ${fileId})`, {
+      fileSize,
+      contentType,
+      fileExtension,
+      expirationDate
+    });
+    
     const fileMetadata = await File.create({
       id: fileId,
       file_name: fileName,
@@ -16,189 +24,286 @@ const saveFileMetadata = async (fileName, fileId, s3Path, uploadDate, fileSize, 
       file_size: fileSize,
       content_type: contentType,
       file_extension: fileExtension,
-      expiration_date: expirationDate, 
+      expiration_date: expirationDate,
     });
-    return fileMetadata.id;  
+    
+    logger.info(`Successfully saved metadata for file: ${fileName} (ID: ${fileId})`, {
+      metadataId: fileMetadata.id,
+      duration: Date.now() - start
+    });
+    statsd.increment('db.file_metadata.create.success');
+    statsd.timing('db.file_metadata.create.duration', Date.now() - start);
+    
+    return fileMetadata.id;
   } catch (error) {
-    console.error('Error saving file metadata:', error);
+    logger.error(`Failed to save metadata for file: ${fileName} (ID: ${fileId})`, { 
+      error: error.message, 
+      stack: error.stack,
+      operation: 'database_create',
+      fileDetails: { fileName, fileId, fileSize }
+    });
+    statsd.increment('db.file_metadata.create.error');
     throw error;
   }
 };
 
+// Upload file handler
 const uploadFile = async (req, res) => {
+  const apiStart = Date.now();
+  
   try {
-    console.log(req.file);  // Log to ensure req.file is populated
     if (!req.file) {
-      return res.status(400);
+      logger.warn('File upload attempt with no file attached', {
+        headers: req.headers,
+        ip: req.ip
+      });
+      return res.status(400).end();
     }
 
-    const fileBuffer = req.file.buffer;  // File data from 'req.file'
-    const fileName = req.file.originalname;  // Original file name
+    const fileBuffer = req.file.buffer;
+    const fileId = uuidv4();
+    const originalFileName = req.file.originalname;
+    const s3FileName = `${fileId}-${originalFileName}`;
     const mimetype = req.file.mimetype;
-    const fileSize = req.file.size;  // Get the file size from the upload
-    const fileId = uuidv4();  // Generate a unique file ID
-
-    // Extract file extension from the file name (e.g., '.jpg')
-    const fileExtension = fileName.split('.').pop().toLowerCase();
-
-    // Set expiration date (e.g., 30 days from the upload date)
+    const fileSize = req.file.size;
+    const fileExtension = originalFileName.split(".").pop().toLowerCase();
     const expirationDate = new Date();
-    expirationDate.setDate(expirationDate.getDate() + 30);  // Set expiration to 30 days from today
+    expirationDate.setDate(expirationDate.getDate() + 30);
 
-    // Upload the file to S3
-    await uploadToS3(fileBuffer, fileName, mimetype);
+    logger.info(`Starting file upload process for: ${originalFileName} (ID: ${fileId})`, {
+      fileSize,
+      mimetype,
+      fileExtension
+    });
 
-    // Format the URL for S3 access
-    const formattedUrl = `${process.env.S3_BUCKET}/${fileId}/${fileName}`;
+    // Upload to S3
+    const s3Start = Date.now();
+    logger.debug(`Initiating S3 upload for file: ${originalFileName}`, {
+      bucket: process.env.S3_BUCKET,
+      key: s3FileName
+    });
+    
+    const s3Url = await s3.upload({
+      Bucket: process.env.S3_BUCKET,
+      Key: s3FileName,
+      Body: fileBuffer,
+      ContentType: mimetype,
+    }).promise();
+    
+    const s3Duration = Date.now() - s3Start;
+    logger.info(`Successfully uploaded to S3: ${originalFileName}`, {
+      s3Location: s3Url.Location,
+      duration: s3Duration,
+      operation: 's3_upload'
+    });
+    statsd.timing('s3.upload.duration', s3Duration);
+    statsd.increment('s3.upload.success');
 
-    const formattedDate = new Date().toISOString().split('T')[0];  // Format the upload date
+    logger.debug(`Saving metadata for uploaded file: ${originalFileName}`);
+    await saveFileMetadata(
+      originalFileName,
+      fileId, 
+      s3Url.Location, 
+      new Date().toISOString().split("T")[0], 
+      fileSize, 
+      mimetype, 
+      expirationDate, 
+      fileExtension
+    );
 
-    // Save file metadata to the database
-    await saveFileMetadata(fileName, fileId, formattedUrl, formattedDate, fileSize, mimetype, expirationDate, fileExtension);
-
-    // Return the response with the file metadata
-    res.status(201).set('X-Status-Message', 'File Added').json({
-      file_name: fileName,
-      id: fileId,
-      url: formattedUrl,
-      upload_date: formattedDate,
+    const totalDuration = Date.now() - apiStart;
+    logger.info(`File upload completed successfully: ${originalFileName}`, {
+      fileId,
+      totalDuration,
+      status: 'success'
+    });
+    statsd.timing('api.file_upload.duration', totalDuration);
+    statsd.increment('api.file_upload.success');
+    
+    res.status(201).json({ 
+      file_name: originalFileName,
+      id: fileId, 
+      url: s3Url.Location,
+      upload_date: new Date().toISOString().split("T")[0] 
     });
   } catch (error) {
-    console.error(error);
-    res.status(400);
+    logger.error('File upload process failed', { 
+      error: error.message, 
+      stack: error.stack,
+      operation: 'file_upload',
+      fileDetails: req.file ? {
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      } : null
+    });
+    statsd.increment('api.file_upload.error');
+    res.status(500).end();
   }
 };
 
-
-// Upload file to S3 function
-const uploadToS3 = async (fileBuffer, fileName, mimetype) => {
-  const params = {
-    Bucket: process.env.S3_BUCKET,
-    Key: fileName,
-    Body: fileBuffer,
-    ContentType: mimetype,
-  };
-
-  try {
-    const data = await s3.upload(params).promise();
-    return data.Location;  // S3 file URL
-  } catch (error) {
-    console.error('Error uploading file to S3:', error);
-    throw error;
-  }
-};
-
-// Function to delete file metadata by fileId
+// Function to delete file metadata from database
 const deleteFileMetadata = async (fileId) => {
+  const start = Date.now();
   try {
-    await File.destroy({
+    logger.info(`Starting deletion of file metadata (ID: ${fileId})`);
+    
+    const result = await File.destroy({
       where: { id: fileId },
     });
-    console.log('File metadata deleted successfully');
+    
+    if (result === 1) {
+      logger.info(`Successfully deleted file metadata (ID: ${fileId})`, {
+        duration: Date.now() - start
+      });
+    } else {
+      logger.warn(`No file metadata found to delete (ID: ${fileId})`);
+    }
+    
+    statsd.increment('db.file_metadata.delete.success');
+    statsd.timing('db.file_metadata.delete.duration', Date.now() - start);
   } catch (error) {
-    console.error('Error deleting file metadata:', error);
+    logger.error(`Failed to delete file metadata (ID: ${fileId})`, { 
+      error: error.message, 
+      stack: error.stack,
+      operation: 'metadata_deletion'
+    });
+    statsd.increment('db.file_metadata.delete.error');
     throw error;
   }
 };
 
+// Delete file handler
 const deleteFile = async (req, res) => {
+  const apiStart = Date.now();
   const fileId = req.params.id;
 
   try {
-    // Get the file metadata from the database
+    logger.info(`Starting file deletion process (ID: ${fileId})`);
+    
     const fileMetadata = await getFileById(fileId);
     if (!fileMetadata) {
-      // File not found, send 404 Not Found
-      return res.status(404)
-        .set('X-Status-Message', 'Not Found')
-        .set('Cache-Control', 'no-cache, no-store, must-revalidate')
-        .set('Pragma', 'no-cache')
-        .set('X-Content-Type-Options', 'nosniff')
-        .end(); // No response body
+      logger.warn(`File not found for deletion (ID: ${fileId})`, {
+        operation: 'file_deletion',
+        status: 'not_found'
+      });
+      return res.status(404).end();
     }
 
-    // Directly delete the file from S3 and database
-    await deleteFromS3(fileMetadata.file_name);
+    const s3Key = `${fileMetadata.id}-${fileMetadata.file_name}`;
+    logger.debug(`Initiating S3 file deletion (Key: ${s3Key})`);
+    
+    const s3Start = Date.now();
+    await s3.deleteObject({
+      Bucket: process.env.S3_BUCKET,
+      Key: s3Key,
+    }).promise();
+    
+    const s3Duration = Date.now() - s3Start;
+    logger.info(`Successfully deleted file from S3 (ID: ${fileId})`, {
+      s3Key,
+      duration: s3Duration
+    });
+    statsd.timing('s3.delete.duration', s3Duration);
+    statsd.increment('s3.delete.success');
+
+    logger.debug(`Deleting metadata for file (ID: ${fileId})`);
     await deleteFileMetadata(fileId);
 
-    // Return 204 No Content for successful deletion with no content in response
-    return res.status(204).send();
+    const totalDuration = Date.now() - apiStart;
+    logger.info(`File deletion completed successfully (ID: ${fileId})`, {
+      totalDuration,
+      status: 'success'
+    });
+    statsd.timing('api.file_delete.duration', totalDuration);
+    statsd.increment('api.file_delete.success');
+    
+    res.status(204).end();
   } catch (error) {
-    console.error(error);
-
-    // Handle general server error with 500 Internal Server Error
-    return res.status(500).json({ message: "Internal server error" });
+    logger.error(`File deletion failed (ID: ${fileId})`, { 
+      error: error.message, 
+      stack: error.stack,
+      operation: 'file_deletion'
+    });
+    statsd.increment('api.file_delete.error');
+    res.status(500).end();
   }
 };
 
-// Delete file from S3
-const deleteFromS3 = async (s3Name) => {
-  // Decode the URL to get the correct file key
-  const key = s3Name;
-
-  console.log('Attempting to delete file from S3 with key:', key); // Log the decoded key to verify
-
-  const params = {
-    Bucket: process.env.S3_BUCKET,  // Ensure this matches your bucket name
-    Key: key,  // Use the decoded key (file path) for deletion
-  };
+// Get file metadata handler
+const getFileMetadata = async (req, res) => {
+  const apiStart = Date.now();
+  const fileId = req.params.id;
 
   try {
-    await s3.deleteObject(params).promise();
-    console.log('File deleted from S3 successfully');
+    logger.info(`Request received for file metadata (ID: ${fileId})`);
+    
+    const fileMetadata = await getFileById(fileId);
+    if (!fileMetadata) {
+      logger.warn(`File metadata not found (ID: ${fileId})`, {
+        operation: 'metadata_retrieval',
+        status: 'not_found'
+      });
+      return res.status(404).end();
+    }
+
+    const duration = Date.now() - apiStart;
+    logger.info(`Successfully retrieved file metadata (ID: ${fileId})`, {
+      duration,
+      fileName: fileMetadata.file_name
+    });
+    statsd.timing('api.file_get.duration', duration);
+    statsd.increment('api.file_get.success');
+    
+    res.status(200).json(fileMetadata);
   } catch (error) {
-    console.error('Error deleting file from S3:', error);
-    throw error;
+    logger.error(`Failed to retrieve file metadata (ID: ${fileId})`, { 
+      error: error.message, 
+      stack: error.stack,
+      operation: 'metadata_retrieval'
+    });
+    statsd.increment('api.file_get.error');
+    res.status(500).end();
   }
 };
 
+// Helper function to get file by ID
 const getFileById = async (fileId) => {
+  const start = Date.now();
   try {
-    // Fetch the file metadata from the database
+    logger.debug(`Fetching file metadata from database (ID: ${fileId})`);
+    
     const fileMetadata = await File.findOne({
       where: { id: fileId },
     });
 
-    // If file is found, return only the necessary fields
     if (fileMetadata) {
+      const duration = Date.now() - start;
+      logger.debug(`Successfully retrieved file from database (ID: ${fileId})`, {
+        duration,
+        fileName: fileMetadata.file_name
+      });
+      statsd.increment('db.file_metadata.read.success');
+      statsd.timing('db.file_metadata.read.duration', duration);
+      
       return {
-        file_name: fileMetadata.file_name, // assuming the field is named 'file_name'
+        file_name: fileMetadata.file_name,
         id: fileMetadata.id,
-        url: fileMetadata.url, // assuming 'user_id' and 'file_name' are present
-        upload_date: fileMetadata.upload_date.toISOString().split('T')[0], // format the date as "YYYY-MM-DD"
+        url: fileMetadata.url,
+        upload_date: fileMetadata.upload_date.toISOString().split('T')[0],
       };
     }
-    return null; // Return null if file not found
+    
+    logger.debug(`No file found in database (ID: ${fileId})`);
+    return null;
   } catch (error) {
-    console.error('Error fetching file metadata:', error);
+    logger.error(`Database query failed for file (ID: ${fileId})`, { 
+      error: error.message, 
+      stack: error.stack,
+      operation: 'database_query'
+    });
+    statsd.increment('db.file_metadata.read.error');
     throw error;
-  }
-};
-
-// Function to retrieve file metadata for the given fileId
-const getFileMetadata = async (req, res) => {
-  const fileId = req.params.id;
-
-  try {
-    const fileMetadata = await getFileById(fileId);
-    if (!fileMetadata) {
-      return res.status(404)
-        .set('X-Status-Message', 'Not Found')
-        .set('Cache-Control', 'no-cache, no-store, must-revalidate')
-        .set('Pragma', 'no-cache')
-        .set('X-Content-Type-Options', 'nosniff')
-        .end(); // No response body;;
-    }
-
-    res.status(200).json(fileMetadata);
-  } catch (error) {
-    console.error(error);
-    res.status(404)
-      .set('X-Status-Message', 'Not Found')
-      .set('Cache-Control', 'no-cache, no-store, must-revalidate')
-      .set('Pragma', 'no-cache')
-      .set('X-Content-Type-Options', 'nosniff')
-      .end(); // No response body;
   }
 };
 

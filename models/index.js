@@ -1,65 +1,93 @@
 require("dotenv").config();
 const { Sequelize } = require("sequelize");
+const logger = require('../cloudwatch/logger');
+const { statsd } = require('../cloudwatch/metrics');
 
-// Check if DATABASE_URL is provided
 let sequelize;
 
+// Database connection setup
 if (process.env.DATABASE_URL) {
-  // Use the DATABASE_URL from environment if it's provided (for both local and production)
-  console.log("Connecting using DATABASE_URL...");
+  logger.info("Connecting using DATABASE_URL");
   sequelize = new Sequelize(process.env.DATABASE_URL, {
-    dialect: process.env.DB_DIALECT || 'postgres',  // Default to 'postgres' if DB_DIALECT is not set
-    logging: false,  // Disable SQL logging for cleaner output
+    dialect: process.env.DB_DIALECT || 'postgres',
+    logging: (sql, timing) => {
+      if (typeof timing === 'number') {
+        statsd.timing('db.query.duration', timing);
+        statsd.increment('db.query.count');
+      }
+    },
   });
 } else {
-  // Fallback to using individual environment variables for connecting to RDS
-  console.log("Connecting to RDS...");
+  logger.info("Connecting to RDS...");
   sequelize = new Sequelize(
-    process.env.DB_NAME,  // Database name
-    process.env.DB_USER,  // Database username
-    process.env.DB_PASSWORD,  // Database password
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
     {
-      host: process.env.DB_HOST,  // RDS endpoint or localhost
-      dialect: 'postgres',  // Database type
-      port: process.env.DB_PORT || 5432,  // Default PostgreSQL port
-      logging: false,  // Disable SQL logging for cleaner output
+      host: process.env.DB_HOST,
+      dialect: 'postgres',
+      port: process.env.DB_PORT || 5432,
+      logging: (sql, timing) => {
+        if (typeof timing === 'number') {
+          statsd.timing('db.query.duration', timing);
+          statsd.increment('db.query.count');
+        }
+      },
       dialectOptions: {
         ssl: {
-          require: true,  // Enforce SSL connection
-          rejectUnauthorized: false // Allow self-signed certificates (if necessary)
+          require: true,
+          rejectUnauthorized: false,
         }
       }
     }
-);
+  );
 }
 
-// Define models
+// Database models setup
 const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
-// Import models here
+// Import models
 db.HealthCheck = require("./healthCheck")(sequelize, Sequelize.DataTypes);
 db.File = require('./fileModel')(sequelize);
 
-// Test the connection
+// Test database connection
+const connectStart = Date.now();
 sequelize.authenticate()
   .then(() => {
-    console.log('Connection has been established successfully.');
+    const duration = Date.now() - connectStart;
+    logger.info('Database connection established');
+    statsd.timing('db.connection.duration', duration);
+    statsd.increment('db.connection.success');
   })
   .catch((error) => {
-    console.error('Unable to connect to the database:', error);
+    const duration = Date.now() - connectStart;
+    logger.error('Database connection failed', { 
+      error: error.message,
+      stack: error.stack
+    });
+    statsd.timing('db.connection.duration', duration);
+    statsd.increment('db.connection.error');
   });
 
-// Sync models (caution with force: true in production, use for development)
-db.sequelize
-  .sync({ force: false })  // Set force to false for production
+// Sync database models
+const syncStart = Date.now();
+db.sequelize.sync({ force: false })
   .then(() => {
-    console.log("Database synced!");
+    const duration = Date.now() - syncStart;
+    logger.info("Database models synced");
+    statsd.timing('db.sync.duration', duration);
+    statsd.increment('db.sync.success');
   })
   .catch((err) => {
-    console.error("Error syncing database:", err);
+    const duration = Date.now() - syncStart;
+    logger.error("Database sync failed", {
+      error: err.message,
+      stack: err.stack
+    });
+    statsd.timing('db.sync.duration', duration);
+    statsd.increment('db.sync.error');
   });
 
-// Export the sequelize instance and db models
 module.exports = db;
