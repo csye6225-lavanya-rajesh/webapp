@@ -92,6 +92,39 @@ app.post('/v1/file', upload.single('profilePic'), async (req, res) => {
   }
 });
 
+app.get("/cicd", async (req, res) => {
+  if (
+    Object.keys(req.body).length > 0 ||
+    Object.keys(req.query).length > 0 ||
+    Object.keys(req.params).length > 0 ||
+    req.headers["content-type"]
+  ) {
+    statsd.increment('api.healthz.invalid_request');
+    return res.status(400).set("Cache-Control", "no-cache").end();
+  }
+
+  try {
+    const dbStart = Date.now();
+    await db.HealthCheck.create({
+      status: "OK",
+      datetime: new Date().toISOString(),
+    });
+    statsd.timing('db.healthcheck.create.duration', Date.now() - dbStart);
+    statsd.increment('db.healthcheck.create.success');
+
+    statsd.increment('api.healthz.success');
+    res.status(200)
+      .set("Cache-Control", "no-cache, no-store, must-revalidate")
+      .end();
+  } catch (err) {
+    logger.error("Health check failed", { error: err.message, stack: err.stack });
+    statsd.increment('api.healthz.error');
+    res.status(503)
+      .set("Cache-Control", "no-cache, no-store, must-revalidate")
+      .end();
+  }
+});
+
 // File delete endpoint
 app.delete("/v1/file/:id", async (req, res) => {
   const start = Date.now();
@@ -122,6 +155,12 @@ app.get("/v1/file/:id", async (req, res) => {
 
 // Method not allowed handlers
 app.all("/healthz", (req, res) => {
+  logger.warn("Method not allowed", { method: req.method, path: req.path });
+  statsd.increment('api.healthz.method_not_allowed');
+  res.status(405).set('Cache-Control', 'no-cache').end();
+});
+
+app.all("/cicd", (req, res) => {
   logger.warn("Method not allowed", { method: req.method, path: req.path });
   statsd.increment('api.healthz.method_not_allowed');
   res.status(405).set('Cache-Control', 'no-cache').end();
