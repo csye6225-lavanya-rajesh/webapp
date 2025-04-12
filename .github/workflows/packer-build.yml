@@ -68,14 +68,13 @@ jobs:
       - name: Build Artifact
         run: |
           echo "Building application artifact..."
-          mkdir -p artifacts
-          echo "Application Artifact" > artifacts/app.zip
+          zip -r artifacts/webapp.zip .
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: application-artifact
-          path: artifacts/app.zip
+          path: artifacts/webapp.zip
 
   build-custom-image:
     name: Build Packer Custom Image (AWS & GCP)
@@ -98,8 +97,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_CREDENTIALS_ACCESSKEY }}
-          aws-secret-access-key: ${{ secrets.AWS_CREDENTIALS_SECRETACCESSKEY }}
+          aws-access-key-id: ${{ secrets.DEV_AWS_CREDENTIALS_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.DEV_AWS_CREDENTIALS_SECRETACCESSKEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Verify AWS CLI Configuration
@@ -121,7 +120,7 @@ jobs:
           packer init machine-image.pkr.hcl 
         continue-on-error: false
 
-      - name: Run Packer Build for AWS #& GCP
+      - name: Run Packer Build for AWS & GCP
         run: |
           cd packer
           export PACKER_VAR_artifact_path="artifacts/app.zip"
@@ -162,3 +161,62 @@ jobs:
       #       --project=gcp-dev-452120 \
       #       --member=serviceAccount:880152553143-compute@developer.gserviceaccount.com \
       #       --role=roles/compute.imageUser
+
+      - name: Configure AWS Demo Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.DEMO_AWS_CREDENTIALS_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.DEMO_AWS_CREDENTIALS_SECRETACCESSKEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get Latest Auto Scaling Group Name
+        run: |
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups \
+            --query "AutoScalingGroups[?AutoScalingGroupName!=''].AutoScalingGroupName" \
+            --output text | head -n 1)
+          echo "ASG_NAME=$ASG_NAME" >> $GITHUB_ENV
+
+      - name: Get Launch Template ID
+        run: |
+          LAUNCH_TEMPLATE_ID=$(aws autoscaling describe-auto-scaling-groups \
+            --auto-scaling-group-name ${{ env.ASG_NAME }} \
+            --query "AutoScalingGroups[0].LaunchTemplate.LaunchTemplateId" \
+            --output text)
+          echo "LAUNCH_TEMPLATE_ID=$LAUNCH_TEMPLATE_ID" >> $GITHUB_ENV
+
+      - name: Update Launch Template
+        run: |
+          aws ec2 create-launch-template-version \
+            --launch-template-id ${{ env.LAUNCH_TEMPLATE_ID }} \
+            --source-version '$Latest' \
+            --launch-template-data "ImageId=${{ env.AMI_ID }}"
+
+      - name: Trigger Instance Refresh
+        id: refresh
+        run: |
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name ${{ env.ASG_NAME }} \
+            --preferences '{"InstanceWarmup": 300, "MinHealthyPercentage": 90}' \
+            --query "InstanceRefreshId" \
+            --output text)
+          echo "REFRESH_ID=$REFRESH_ID" >> $GITHUB_ENV
+
+      - name: Wait for Instance Refresh
+        run: |
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name ${{ env.ASG_NAME }} \
+              --instance-refresh-ids ${{ env.REFRESH_ID }} \
+              --query "InstanceRefreshes[0].Status" \
+              --output text)
+            echo "Current status: $STATUS"
+            
+            if [[ "$STATUS" == "Successful" ]]; then
+              echo "Refresh succeeded!"
+              break
+            elif [[ "$STATUS" == "Failed" || "$STATUS" == "Cancelled" ]]; then
+              echo "Refresh failed or was cancelled"
+              exit 1
+            fi
+            sleep 30
+          done
