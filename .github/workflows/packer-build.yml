@@ -189,22 +189,32 @@ jobs:
             --output text)
           echo "LAUNCH_TEMPLATE_ID=$LAUNCH_TEMPLATE_ID" >> $GITHUB_ENV
 
-      - name: Update Launch Template
+      - name: Create New Launch Template Version and Capture Version Number
+        id: new_lt_version
         run: |
-          aws ec2 create-launch-template-version \
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
             --launch-template-id ${{ env.LAUNCH_TEMPLATE_ID }} \
             --source-version '$Latest' \
-            --launch-template-data "ImageId=${{ env.AMI_ID }}"
+            --launch-template-data "ImageId=${{ env.AMI_ID }}" \
+            --query 'LaunchTemplateVersion.VersionNumber' \
+            --output text)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Trigger Instance Refresh
         id: refresh
         run: |
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
             --auto-scaling-group-name ${{ env.ASG_NAME }} \
-            --preferences '{"InstanceWarmup": 300, "MinHealthyPercentage": 90}' \
+            --preferences '{"InstanceWarmup": 60, "MinHealthyPercentage": 90}' \
             --query "InstanceRefreshId" \
             --output text)
           echo "REFRESH_ID=$REFRESH_ID" >> $GITHUB_ENV
+
+      - name: Update Auto Scaling Group to Use New Launch Template Version
+        run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name ${{ env.ASG_NAME }} \
+            --launch-template "LaunchTemplateId=${{ env.LAUNCH_TEMPLATE_ID }},Version=${{ env.NEW_VERSION }}"
 
       - name: Wait for Instance Refresh
         run: |
