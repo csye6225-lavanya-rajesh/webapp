@@ -72,3 +72,13 @@ The responses will be:
 - 200 OK: If the database is reachable and the health record is inserted successfully.
 - 503 Service Unavailable: If the database is unreachable.
 - 405 Method Not Allowed: If the method is other than GET.
+
+**Command to Import the Certificate**
+```bash
+aws acm import-certificate \
+  --certificate fileb://<path-to-certificate>/<certificate-file>.crt \
+  --private-key fileb://<path-to-certificate>/<private-key-file>.key \
+  --certificate-chain fileb://<path-to-certificate>/<certificate-chain-file>.ca-bundle \
+  --region <aws-region> \
+  --profile <aws-profile>
+```
