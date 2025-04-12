@@ -124,6 +124,16 @@ build {
       # Install required packages, including zip
       "sudo apt install -y curl gnupg lsb-release unzip zip",
 
+      # Install dependencies
+      "sudo apt-get install -y unzip curl jq",
+
+      # Install AWS CLI v2
+      "cd /tmp",
+      "curl 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip' -o 'awscliv2.zip'",
+      "unzip -q awscliv2.zip",
+      "sudo ./aws/install",
+      "export PATH=$PATH:/usr/local/bin",
+
       # # Add PostgreSQL repository and install PostgreSQL
       # "curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc",
       # "echo \"deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -c | awk '{print $2}')-pgdg main\" | sudo tee /etc/apt/sources.list.d/pgdg.list",
