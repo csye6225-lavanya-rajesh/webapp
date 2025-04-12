@@ -68,13 +68,14 @@ jobs:
       - name: Build Artifact
         run: |
           echo "Building application artifact..."
-          zip -r artifacts/webapp.zip .
+          mkdir -p artifacts
+          echo "Application Artifact" > artifacts/app.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: application-artifact
-          path: artifacts/webapp.zip
+          path: artifacts/app.zip
 
   build-custom-image:
     name: Build Packer Custom Image (AWS & GCP)
@@ -168,6 +169,10 @@ jobs:
           aws-access-key-id: ${{ secrets.DEMO_AWS_CREDENTIALS_ACCESSKEY }}
           aws-secret-access-key: ${{ secrets.DEMO_AWS_CREDENTIALS_SECRETACCESSKEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify AWS CLI Configuration
+        run: |
+          aws sts get-caller-identity
 
       - name: Get Latest Auto Scaling Group Name
         run: |
