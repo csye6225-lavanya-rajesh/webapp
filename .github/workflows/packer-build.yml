@@ -200,6 +200,12 @@ jobs:
             --output text)
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
+      - name: Update Auto Scaling Group to Use New Launch Template Version
+        run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name ${{ env.ASG_NAME }} \
+            --launch-template "LaunchTemplateId=${{ env.LAUNCH_TEMPLATE_ID }},Version=${{ env.NEW_VERSION }}"
+
       - name: Trigger Instance Refresh
         id: refresh
         run: |
@@ -209,12 +215,6 @@ jobs:
             --query "InstanceRefreshId" \
             --output text)
           echo "REFRESH_ID=$REFRESH_ID" >> $GITHUB_ENV
-
-      - name: Update Auto Scaling Group to Use New Launch Template Version
-        run: |
-          aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name ${{ env.ASG_NAME }} \
-            --launch-template "LaunchTemplateId=${{ env.LAUNCH_TEMPLATE_ID }},Version=${{ env.NEW_VERSION }}"
 
       - name: Wait for Instance Refresh
         run: |
